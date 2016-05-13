@@ -10,12 +10,15 @@ using Microsoft.WindowsAzure.Diagnostics;
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.Storage;
 
+
 namespace DnsServer
 {
     public class WorkerRole : RoleEntryPoint
     {
         private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
         private readonly ManualResetEvent runCompleteEvent = new ManualResetEvent(false);
+
+        private PenTestingDnsServer server;
 
         public override void Run()
         {
@@ -43,12 +46,18 @@ namespace DnsServer
 
             Trace.TraceInformation("DnsServer has been started");
 
+            // Proxy to google's DNS
+            server = new PenTestingDnsServer();
+
             return result;
         }
 
         public override void OnStop()
         {
             Trace.TraceInformation("DnsServer is stopping");
+
+            Trace.TraceInformation("Server stopping");
+            server.Close();
 
             this.cancellationTokenSource.Cancel();
             this.runCompleteEvent.WaitOne();
@@ -60,11 +69,15 @@ namespace DnsServer
 
         private async Task RunAsync(CancellationToken cancellationToken)
         {
-            // TODO: Replace the following with your own logic.
+            Trace.TraceInformation("Server starting");
+            // Start the server (by default it listents on port 53)
+            server.Listen();
+
+            //// TODO: Replace the following with your own logic.
             while (!cancellationToken.IsCancellationRequested)
             {
                 Trace.TraceInformation("Working");
-                await Task.Delay(1000);
+                await Task.Delay(5000);
             }
         }
     }
