@@ -9,7 +9,7 @@ using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.Diagnostics;
 using Microsoft.WindowsAzure.ServiceRuntime;
 using Microsoft.WindowsAzure.Storage;
-
+using Microsoft.Owin.Hosting;
 
 namespace DnsServer
 {
@@ -19,6 +19,7 @@ namespace DnsServer
         private readonly ManualResetEvent runCompleteEvent = new ManualResetEvent(false);
 
         private PenTestingDnsServer server;
+        private IDisposable _app = null;
 
         public override void Run()
         {
@@ -46,8 +47,15 @@ namespace DnsServer
 
             Trace.TraceInformation("DnsServer has been started");
 
-            // Proxy to google's DNS
-            server = new PenTestingDnsServer();
+            var endpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["Endpoint2"];
+            string baseUri = String.Format("{0}://{1}",
+                endpoint.Protocol, endpoint.IPEndpoint);
+
+            Trace.TraceInformation(String.Format("Starting OWIN at {0}", baseUri), "Information");
+
+            _app = WebApp.Start<Startup>(new StartOptions(url: baseUri));
+
+            server = PenTestingDnsServer.Instance;
 
             return result;
         }
@@ -58,6 +66,11 @@ namespace DnsServer
 
             Trace.TraceInformation("Server stopping");
             server.Close();
+
+            if (_app != null)
+            {
+                _app.Dispose();
+            }
 
             this.cancellationTokenSource.Cancel();
             this.runCompleteEvent.WaitOne();
