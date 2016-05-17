@@ -23,7 +23,7 @@ namespace DnsServer
 
         public override void Run()
         {
-            Trace.TraceInformation("DnsServer is running");
+            Log.Information("DnsServer is running");
 
             try
             {
@@ -45,26 +45,33 @@ namespace DnsServer
 
             bool result = base.OnStart();
 
-            Trace.TraceInformation("DnsServer has been started");
+            Log.Information("DnsServer has been started");
 
-            var endpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["Endpoint2"];
+            var endpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["WebAPI"];
             string baseUri = String.Format("{0}://{1}",
                 endpoint.Protocol, endpoint.IPEndpoint);
 
-            Trace.TraceInformation(String.Format("Starting OWIN at {0}", baseUri), "Information");
+            Log.Information(String.Format("Starting OWIN at {0}", baseUri));
 
             _app = WebApp.Start<Startup>(new StartOptions(url: baseUri));
 
+            // Start the server (by default it listents on port 53)
+            var dnsEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["DnsService"].IPEndpoint;
+#if DEBUG
+            dnsEndpoint = new IPEndPoint(IPAddress.Any, 53);
+#endif
+            Log.Information(String.Format("Starting DNS Server at {0}", dnsEndpoint));
             server = PenTestingDnsServer.Instance;
+            server.Listen(dnsEndpoint);
 
             return result;
         }
 
         public override void OnStop()
         {
-            Trace.TraceInformation("DnsServer is stopping");
+            Log.Information("DnsServer is stopping");
 
-            Trace.TraceInformation("Server stopping");
+            Log.Information("Server stopping");
             server.Close();
 
             if (_app != null)
@@ -77,19 +84,15 @@ namespace DnsServer
 
             base.OnStop();
 
-            Trace.TraceInformation("DnsServer has stopped");
+            Log.Information("DnsServer has stopped");
         }
 
         private async Task RunAsync(CancellationToken cancellationToken)
         {
-            Trace.TraceInformation("Server starting");
-            // Start the server (by default it listents on port 53)
-            server.Listen();
+            Log.Information("Server starting");
 
-            //// TODO: Replace the following with your own logic.
             while (!cancellationToken.IsCancellationRequested)
             {
-                // Trace.TraceInformation("Working");
                 await Task.Delay(5000);
             }
         }
